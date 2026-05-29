@@ -1,0 +1,39 @@
+# 平安证券ETF条件单 - 下单前校验配置
+# 最后更新：2026-05-28
+
+pre_trade_checks:
+  enabled: true
+  data_source: "pingan_app"
+
+  generation_checks:
+    enabled: true
+    description: "生成时静态校验（盘后/隔夜仍安全）"
+    rules:
+      schema_check: true
+      lot_size_check: true
+      tick_size_check: true
+      safety_limit_check: true
+      reservation_plan_check: true
+
+  activation_checks:
+    enabled: true
+    run_before_window_minutes: 3
+    description: "窗口前2-3分钟动态校验（防止行情失效）"
+    rules:
+      balance_check: true
+      position_check: true
+      sellable_position_check: true
+      liquidity_check: true
+      limit_check: true
+      quote_staleness_check: true
+      reservation_check: true
+
+reservation_rules:
+  enabled: true
+  reserve_scope: "symbol_side_account_day"
+  reserve_until: "activation_window_end"
+  release_policy:
+    untriggered: "release_at_window_end"
+    partially_filled: "release_remaining_at_window_end"
+    cancelled: "release_immediately"
+    rejected: "release_immediately"

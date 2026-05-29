@@ -1,0 +1,34 @@
+# 平安证券ETF条件单 - 时间窗口配置
+# 最后更新：2026-05-28
+
+generation: "anytime"
+
+activation:
+  - name: "morning"
+    start: "09:40:00"
+    end: "10:30:00"
+    description: "早盘流动性稳定期"
+    enabled: true
+    broker_setting:
+      monitor_start: "09:40"
+      monitor_end: "10:30"
+      weekdays: "周一~周五"
+
+  - name: "afternoon"
+    start: "13:00:00"
+    end: "14:40:00"
+    description: "午后主力窗口"
+    enabled: true
+    broker_setting:
+      monitor_start: "13:00"
+      monitor_end: "14:40"
+      weekdays: "周一~周五"
+
+  - name: "close"
+    start: "14:57:00"
+    end: "15:00:00"
+    description: "尾盘集合竞价（默认关闭）"
+    enabled: false
+    allowed_exchanges: ["SSE"]
+    allowed_asset_types: ["equity_etf"]
+    manual_enable_required: true

@@ -1,0 +1,43 @@
+# 平安证券ETF条件单 - 执行规则配置
+# 最后更新：2026-05-28
+
+execution_rules:
+  buy_rule:
+    trigger: "last_price <= threshold_price"
+    action: "place_buy_order"
+    order_type: "限价委托"
+    price_type: "即时卖一价"
+    auto_cancel_seconds: 30
+    max_slippage_pct: 0.003
+    description: "最新价跌破阈值时，以即时卖一价限价买入"
+
+  sell_rule:
+    trigger: "last_price >= threshold_price"
+    action: "place_sell_order"
+    order_type: "限价委托"
+    price_type: "即时买一价"
+    auto_cancel_seconds: 30
+    max_slippage_pct: 0.003
+    description: "最新价突破阈值时，以即时买一价限价卖出"
+
+  broker_strategy_type: "到价买入/到价卖出"
+  monitoring_interval: "3秒（Level-1行情）"
+
+security_master:
+  "510300":
+    name: "沪深300ETF"
+    exchange: "SSE"
+    lot_size: 100
+    tick_size: 0.001
+    t0_sell_allowed: false
+    default_window: ["morning", "afternoon"]
+    close_window_enabled: false
+
+  "510500":
+    name: "中证500ETF"
+    exchange: "SSE"
+    lot_size: 100
+    tick_size: 0.001
+    t0_sell_allowed: false
+    default_window: ["morning", "afternoon"]
+    close_window_enabled: false
