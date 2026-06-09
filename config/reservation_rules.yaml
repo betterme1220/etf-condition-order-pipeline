@@ -1,0 +1,40 @@
+reservation:
+  enabled: true
+  source: "portfolio_source.yaml"
+
+buy:
+  reserve_cash_formula: "target_quantity * protected_limit_price * 1.02"
+  cash_buffer_pct: 0.02
+  release_on:
+    - REJECTED
+    - CANCELLED
+    - EXPIRED
+    - RECONCILED
+
+sell:
+  reserve_position_formula: "target_quantity"
+  position_field: "quantity"
+  release_on:
+    - REJECTED
+    - CANCELLED
+    - EXPIRED
+    - RECONCILED
+
+conflict_detection:
+  same_etf_same_direction:
+    enabled: true
+    rule: "existing_reserved_value + new_order_value <= max_single_trade_pct * nav"
+
+  same_etf_opposite_direction:
+    enabled: true
+    action: "need_review"
+    description: "同一ETF同时存在买入和卖出预约时，必须人工复核"
+
+limits:
+  max_reserved_cash_pct_of_nav: 0.25
+  max_reserved_position_pct_of_holding: 1.00
+
+on_fail:
+  insufficient_cash: "RESERVATION_FAILED"
+  insufficient_position: "RESERVATION_FAILED"
+  conflict_detected: "NEED_REVIEW"

@@ -1,0 +1,56 @@
+# 平安证券ETF条件单 - 执行规则配置
+# 最后更新：2026-05-28
+#
+# 说明：
+# - 本文件只定义执行规则，不维护 security_master。
+# - 标的、持仓、品种、渠道等信息来自 portfolio_source.yaml 指向的 portfolio-monitor.xlsx。
+# - 最终硬红线以 safety_limits.py 为准，YAML 只能更严格，不能更宽松。
+
+execution_rules:
+  buy_rule:
+    trigger: "last_price <= threshold_price"
+    action: "place_buy_order"
+    order_type: "限价委托"
+    price_type_priority:
+      - "指定保护限价"
+      - "即时卖一价"
+    auto_cancel_seconds: 30
+    max_slippage_pct: 0.003
+    description: "最新价跌破阈值时，优先以指定保护限价买入；如人工确认使用即时价，则需通过盘口检查。"
+
+  sell_rule:
+    trigger: "last_price >= threshold_price"
+    action: "place_sell_order"
+    order_type: "限价委托"
+    price_type_priority:
+      - "指定保护限价"
+      - "即时买一价"
+    auto_cancel_seconds: 30
+    max_slippage_pct: 0.003
+    description: "最新价突破阈值时，优先以指定保护限价卖出；如人工确认使用即时价，则需通过盘口检查。"
+
+  broker_strategy_type: "到价买入/到价卖出"
+  monitoring_interval: "3秒（Level-1行情）"
+
+protected_limit_price:
+  enabled: true
+  buy_formula: "min(threshold_price * (1 + max_slippage_pct), limit_up)"
+  sell_formula: "max(threshold_price * (1 - max_slippage_pct), limit_down)"
+  rounding: "tick_size"
+  description: "保护限价由系统计算，人工在券商APP中填写。"
+
+instant_price_guard:
+  enabled: true
+  applies_to:
+    - "即时卖一价"
+    - "即时买一价"
+  max_order_qty_pct_of_best_level_volume: 0.50
+  max_spread_ticks: 2
+  fail_action: "downgrade_to_protected_limit"
+
+forbidden:
+  margin_trading: true
+  short_sell: true
+  after_hours_order: true
+  non_etf_order: true
+  direct_broker_api_order: true

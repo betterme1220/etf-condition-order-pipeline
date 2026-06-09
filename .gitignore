@@ -1,6 +1,51 @@
+# ========= 隐私数据 / 运行输出：禁止进 Git =========
 logs/
 evidence/
 broker_exports/
+output/
+outputs/
+reconcile/
+daily_summary/
+weekly_reports/
+manifests/
+data/
+
+# 本地持仓、券商导出、对账结果、人工审核表
+*.xlsx
+*.xls
+*.csv
+
+# 允许 examples / schemas 里的样例文件进入 Git
+!examples/*.csv
+!examples/*.xlsx
+!schemas/*.csv
+!schemas/*.xlsx
+
+# 本地环境与密钥
+.env
+.env.*
+*.secret
+*.key
+*.pem
+
+# ========= Python =========
 __pycache__/
 *.pyc
-.env
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ========= IDE =========
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ========= OS =========
+.DS_Store
+Thumbs.db

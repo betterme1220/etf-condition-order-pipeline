@@ -1,0 +1,76 @@
+dynamic_validation:
+  quote_stale_seconds: 300
+
+  hard_fail:
+    - id: no_human_approval
+      rule: "human_approval_status != APPROVED"
+      action: reject
+
+    - id: insufficient_cash_or_position
+      rule: "available_capacity < required_capacity"
+      action: reject
+
+    - id: quote_stale
+      rule: "quote_age_seconds > 300"
+      action: reject
+
+afternoon_impact_check:
+  enabled: true
+  session: "afternoon_session"
+  reference_price: "morning_close_price"
+
+  trigger_conditions:
+    price_deviation_pct_gt: 0.005
+    spread_multiplier_gt: 3.0
+
+  action: "force_recalibration_review"
+  notes: "午间冲击触发后不直接降级，先要求再校准判断"
+
+b_level_order_price_check:
+  enabled: true
+  applies_to_price_types:
+    - "即时卖一价"
+    - "即时买一价"
+
+  max_quantity_pct_of_best_level_volume: 0.50
+  max_spread_ticks: 2
+  fail_action: "degrade"
+
+degradation_sequence:
+  - level: L1
+    action: "reduce_quantity"
+    factor: 0.80
+
+  - level: L2
+    action: "tighten_slippage"
+    factor: 0.80
+
+  - level: L3
+    action: "change_order_price_type"
+    from:
+      - "即时卖一价"
+      - "即时买一价"
+    to: "指定保护限价"
+
+  - level: L4
+    action: "change_trigger_action"
+    to: "NOTIFY_ONLY"
+
+recalibration:
+  enabled: true
+  allowed_fields:
+    - threshold_price
+    - max_slippage_pct
+    - target_quantity
+    - time_window
+
+  forbidden_fields:
+    - etf_code
+    - direction
+    - signal_id
+    - signal_source
+
+  max_threshold_adjustment_pct: 0.005
+  require_original_value_record: true
+  require_new_value_record: true
+  require_reason: true

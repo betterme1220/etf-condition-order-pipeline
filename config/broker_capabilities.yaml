@@ -1,0 +1,452 @@
+# 平安证券 ETF 条件单 - 券商APP能力配置
+#
+# 当前模式：
+# - 不直连券商API
+# - 不自动点击APP
+# - 系统只输出“人工填写清单”
+# - 人工确认后，在平安APP策略交易页面手动创建策略
+#
+# 配置原则：
+# - 截图已确认的能力：screenshot_confirmed
+# - 仅从菜单看到、未进入详情页的模板：menu_observed_only
+# - 由交易常识推断但截图未确认的字段：inferred_not_screenshot_confirmed
+# - MVP阶段只推荐截图确认且字段清楚的模板
+
+broker:
+  id: "pingan"
+  name: "平安证券"
+  app_name: "平安证券APP"
+  module_name: "策略交易"
+  mode: "manual_app_checklist_only"
+
+global_policy:
+  require_human_approval: true
+  allow_system_direct_broker_api_order: false
+  allow_auto_click_app: false
+  output_app_fill_checklist_only: true
+
+  allow_etf_only: true
+  forbid_margin_trading: true
+  forbid_non_etf_order: true
+  forbid_after_hours_order: true
+
+  require_manual_confirm_before_app_setup: true
+
+  # APP虽然支持更长监控时段，但系统输出必须优先使用内部订单窗口。
+  # 禁止人工默认照抄全天 09:30-14:57，除非订单明确是全天策略。
+  monitor_window_source_priority:
+    - "internal_order.monitor_start"
+    - "internal_order.monitor_end"
+    - "time_windows.condition_order_monitor_windows"
+  forbid_using_full_day_default_without_order_instruction: true
+
+observed_app_facts:
+  quote_source: "Level-1行情"
+  quote_update_interval_seconds: 3
+  supported_assets_from_screenshot:
+    - "沪深A股股票"
+    - "沪深基金"
+    - "沪深债券"
+  framework_allowed_assets:
+    - "场内ETF"
+  note: "APP支持范围更大，但本框架只允许场内ETF。"
+
+order_price_types:
+  instant_ask:
+    display_name: "即时卖一价"
+    side: "buy"
+    risk_level: "B"
+    confirmation_status: "screenshot_confirmed"
+    description: "买入时使用APP显示的即时卖一价。"
+    system_action: "输出提示，人工确认"
+    required_manual_checks:
+      - "盘口价差是否过大"
+      - "委托数量是否明显超过卖一挂单量"
+      - "是否接受APP固定自动撤单时间30秒"
+
+  instant_bid:
+    display_name: "即时买一价"
+    side: "sell"
+    risk_level: "B"
+    confirmation_status: "inferred_not_screenshot_confirmed"
+    description: "卖出时通常应使用即时买一价，但当前截图未展示卖出方向的价格下拉项。"
+    system_action: "输出提示，人工必须在APP中确认"
+    required_manual_checks:
+      - "确认卖出方向下委托价格是否可选择即时买一价"
+      - "盘口价差是否过大"
+      - "委托数量是否明显超过买一挂单量"
+      - "是否接受APP固定自动撤单时间30秒"
+
+  limit_order:
+    display_name: "限价委托"
+    risk_level: "A"
+    confirmation_status: "screenshot_confirmed"
+    description: "APP委托方式为限价委托。实际买入/卖出价格由APP价格字段决定。"
+
+condition_order_templates:
+  grid_trading:
+    display_name: "网格交易"
+    template_status: "screenshot_confirmed"
+    recommended: true
+    mvp_allowed: true
+    live_use_mode: "manual_app_setup"
+    purpose: "自动执行高卖低买委托"
+    framework_role: "输出网格参数和风控提示，人工在APP创建策略"
+
+    supported_for_framework: true
+    allowed_assets:
+      - "场内ETF"
+
+    app_entry_path:
+      - "策略交易"
+      - "组合策略"
+      - "网格交易"
+
+    field_mapping:
+      security_code: "代码"
+      initial_base_price: "初始基准价"
+
+      grid_type: "涨跌类型"
+
+      # 按百分比模式字段
+      sell_up_pct: "每上涨...卖出"
+      buy_down_pct: "每下跌...买入"
+
+      # 按差价模式字段
+      sell_up_price_diff: "每上涨...元卖出"
+      buy_down_price_diff: "每下跌...元买入"
+      price_diff_unit: "元"
+
+      validity_until: "有效期至"
+      order_method: "委托方式"
+      buy_price: "买入价格"
+      sell_price: "卖出价格"
+      order_quantity: "委托数量"
+      fail_action: "委托失败或超限"
+
+      price_range_limit_enabled: "价格区间限制"
+      price_range_lower: "价格区间下限"
+      price_range_upper: "价格区间上限"
+
+      position_limit_enabled: "持仓数量限制"
+      min_position_qty: "最低持仓数量"
+      max_position_qty: "最高持仓数量"
+
+      multiple_order_enabled: "倍数委托"
+      single_order_qty_upper: "单笔委托上限"
+
+    observed_supported_values:
+      grid_type:
+        - value: "按百分比"
+          confirmation_status: "screenshot_confirmed"
+          mvp_recommended: true
+          unit: "%"
+          description: "MVP阶段推荐使用，人工不容易误解单位。"
+
+        - value: "按差价"
+          confirmation_status: "screenshot_confirmed"
+          mvp_recommended: false
+          unit: "元"
+          description: "价格差值单位按APP界面理解为元。MVP阶段不推荐，除非人工明确确认。"
+
+      validity_shortcuts:
+        - "1日"
+        - "1周"
+        - "1个月"
+        - "3个月"
+
+      order_method:
+        - "限价委托"
+
+      buy_price:
+        - "即时卖一价"
+
+      sell_price:
+        - "即时买一价"
+
+      fail_action:
+        - "自动休眠"
+        - "终止策略"
+
+      advanced_settings:
+        - "价格区间限制"
+        - "持仓数量限制"
+        - "倍数委托"
+
+    default_output_values:
+      # MVP默认只用按百分比，避免“按差价”单位误填。
+      grid_type: "按百分比"
+      grid_type_reason: "MVP阶段优先使用百分比，避免差价单位误填。"
+
+      order_method: "限价委托"
+      buy_price: "即时卖一价"
+      sell_price: "即时买一价"
+      fail_action: "自动休眠"
+      validity_shortcut: "1日"
+
+      enable_price_range_limit: true
+      enable_position_limit: true
+      enable_multiple_order: true
+
+    recommended_parameter_formulas:
+      # 网格比例
+      grid_pct:
+        default_pct: 1.0
+        conservative_pct: 1.5
+        min_pct: 0.5
+        max_pct: 3.0
+        unit: "%"
+        description: "ETF小规模试运行默认1%，波动较大时可放宽到1.5%。"
+
+      # 如果人工坚持选择按差价，系统可用这个公式给参考值。
+      price_diff:
+        formula: "round_to_tick(initial_base_price * grid_pct / 100)"
+        unit: "元"
+        example: "基准价3.000，网格1%，差价约0.030元"
+        mvp_recommended: false
+        require_manual_confirm: true
+
+      # 价格区间限制，避免无边界网格。
+      price_range:
+        enabled: true
+        lower_formula: "round_to_tick(initial_base_price * (1 - price_range_pct / 100))"
+        upper_formula: "round_to_tick(initial_base_price * (1 + price_range_pct / 100))"
+        default_price_range_pct: 3.0
+        conservative_price_range_pct: 2.0
+        max_price_range_pct_for_mvp: 5.0
+        description: "MVP阶段建议价格区间控制在基准价上下2%-3%，最大不超过5%。"
+
+      # 持仓数量限制，避免无限加仓或卖空。
+      position_range:
+        enabled: true
+        min_position_qty_formula: "max(0, current_position_qty - max_sell_qty)"
+        max_position_qty_formula: "current_position_qty + max_buy_qty"
+        default_max_buy_qty_formula: "order_quantity * 3"
+        default_max_sell_qty_formula: "min(current_position_qty, order_quantity * 3)"
+        description: "默认最多允许连续3格买入或3格卖出，避免策略失控。"
+
+      # 单笔委托上限。
+      single_order_qty_upper:
+        enabled: true
+        formula: "order_quantity"
+        description: "MVP阶段单笔委托上限等于本次委托数量，不允许倍数放大。"
+
+    manual_confirm_items:
+      - "确认代码为场内ETF"
+      - "确认初始基准价与当前行情接近"
+      - "确认涨跌类型为按百分比"
+      - "确认每上涨卖出百分比"
+      - "确认每下跌买入百分比"
+      - "确认有效期优先选择1日"
+      - "确认委托失败或超限选择自动休眠"
+      - "确认已开启价格区间限制"
+      - "确认价格区间上下限已填写"
+      - "确认已开启持仓数量限制"
+      - "确认最低/最高持仓数量已填写"
+      - "确认单笔委托上限未放大"
+
+    safety_notes:
+      - "网格交易适合高卖低买，但必须设置价格区间限制。"
+      - "必须设置持仓数量限制，避免无限加仓或卖空。"
+      - "MVP阶段建议有效期先用1日。"
+      - "委托失败或超限建议选择自动休眠。"
+      - "APP使用Level-1行情，约3秒更新一次，不适合高频精细触发。"
+
+  daily_pct_change:
+    display_name: "日涨跌幅"
+    template_status: "screenshot_confirmed"
+    recommended: true
+    mvp_allowed: true
+    live_use_mode: "manual_app_setup"
+    purpose: "达到预设日涨跌幅时触发买入或卖出委托"
+    framework_role: "输出涨跌幅、方向、价格、数量、监控时段，人工在APP创建策略"
+
+    supported_for_framework: true
+    allowed_assets:
+      - "场内ETF"
+
+    app_entry_path:
+      - "策略交易"
+      - "组合策略"
+      - "日涨跌幅"
+
+    field_mapping:
+      security_code: "代码"
+      pct_type: "日涨跌幅类型"
+      pct_value: "涨幅/跌幅"
+      validity_until: "有效期至"
+      order_side: "委托方向"
+      order_method: "委托方式"
+      order_price: "委托价格"
+      order_quantity: "委托数量"
+      trigger_action: "触发后"
+      auto_cancel_enabled: "自动撤单"
+      auto_cancel_seconds: "自动撤单时间"
+      monitor_enabled: "监控时段"
+      monitor_weekdays: "周期时段"
+      monitor_start: "开始时间"
+      monitor_end: "结束时间"
+
+    observed_supported_values:
+      pct_type:
+        - "涨幅"
+        - "跌幅"
+
+      order_side:
+        - "买入"
+        - "卖出"
+
+      order_method:
+        - "限价委托"
+
+      order_price_by_side:
+        buy:
+          expected_value: "即时卖一价"
+          confirmation_status: "screenshot_confirmed"
+          description: "截图中买入方向显示委托价格为即时卖一价。"
+
+        sell:
+          expected_value: "即时买一价"
+          confirmation_status: "inferred_not_screenshot_confirmed"
+          description: "卖出方向按交易逻辑应为即时买一价，但当前截图未展示卖出方向价格下拉项，人工设置时必须确认。"
+
+      trigger_action:
+        - "自动下单"
+        - "仅通知"
+
+      auto_cancel_seconds:
+        - 30
+
+      monitor_weekdays:
+        - "周一 ~ 周五"
+
+      validity_shortcuts:
+        - "1日"
+        - "1周"
+        - "1个月"
+        - "3个月"
+
+    default_output_values:
+      order_method: "限价委托"
+
+      # MVP默认更安全。小规模实盘确认后，可由人工改为自动下单。
+      trigger_action: "仅通知"
+      trigger_action_for_small_live_pilot: "自动下单"
+
+      auto_cancel_enabled: true
+      auto_cancel_seconds: 30
+
+      monitor_weekdays: "周一 ~ 周五"
+
+      # 不再默认写全天。Adapter 必须从内部订单窗口取值。
+      monitor_start_source: "internal_order.monitor_start"
+      monitor_end_source: "internal_order.monitor_end"
+      forbid_default_full_day_monitoring: true
+
+      validity_shortcut: "1日"
+
+    window_policy:
+      use_internal_order_window: true
+      forbid_full_day_when_order_has_specific_window: true
+      fallback_if_missing_internal_window:
+        action: "reject"
+        reason: "缺少内部订单监控窗口，禁止使用APP全天默认时段"
+
+    manual_confirm_items:
+      - "确认日涨跌幅类型是涨幅还是跌幅"
+      - "确认委托方向是买入还是卖出"
+      - "确认买入方向价格为即时卖一价"
+      - "若为卖出，必须确认APP中委托价格为即时买一价或人工认可的卖出价格"
+      - "确认触发后动作，小规模阶段优先仅通知"
+      - "确认自动撤单为30秒"
+      - "确认监控时段来自系统清单，不照抄APP默认全天"
+      - "确认有效期优先选择1日"
+
+    safety_notes:
+      - "日涨跌幅模板的基准价由APP计算，系统不再把价格阈值强行换算为涨跌幅。"
+      - "如果信号是价格阈值，优先使用网格交易或到价模板。"
+      - "截图显示自动撤单时间为30秒，系统只输出该字段，不再尝试配置15秒。"
+      - "小规模阶段默认输出仅通知，自动下单需人工二次确认。"
+
+  price_reached_buy:
+    display_name: "到价买入"
+    template_status: "menu_observed_only"
+    recommended: false
+    mvp_allowed: false
+    live_use_mode: "manual_app_setup_after_detail_confirmed"
+    purpose: "达到预设价格时触发买入委托"
+    supported_for_framework: "pending_detail_confirmation"
+    app_entry_path:
+      - "策略交易"
+      - "买入策略"
+      - "到价买入"
+    note: "当前只确认菜单存在，未确认详细字段。暂不推荐MVP使用。需要补充详情页截图后再启用。"
+
+  price_reached_sell:
+    display_name: "到价卖出"
+    template_status: "menu_observed_only"
+    recommended: false
+    mvp_allowed: false
+    live_use_mode: "manual_app_setup_after_detail_confirmed"
+    purpose: "达到预设价格时触发卖出委托"
+    supported_for_framework: "pending_detail_confirmation"
+    app_entry_path:
+      - "策略交易"
+      - "卖出策略"
+      - "到价卖出"
+    note: "当前只确认菜单存在，未确认详细字段。暂不推荐MVP使用。需要补充详情页截图后再启用。"
+
+disabled_or_not_used_templates:
+  rebound_buy:
+    display_name: "反弹买入"
+    reason: "不是本框架的高卖低买基础模板，暂不使用"
+
+  fixed_investment:
+    display_name: "定期定投"
+    reason: "属于定投流程，不属于条件单高卖低买"
+
+  pullback_sell:
+    display_name: "回落卖出"
+    reason: "暂不纳入MVP"
+
+  board_open_sell:
+    display_name: "开板卖出"
+    reason: "不适用于ETF条件单MVP"
+
+  take_profit_stop_loss:
+    display_name: "止盈止损"
+    reason: "暂不纳入MVP，避免和网格/到价规则冲突"
+
+  moving_average_break:
+    display_name: "均线突破"
+    reason: "依赖技术指标，不属于当前简单条件单MVP"
+
+  ipo_subscription:
+    display_name: "预约打新"
+    reason: "非ETF交易"
+
+  bond_repo:
+    display_name: "债券通用回购"
+    reason: "非ETF交易"
+
+adapter_output_policy:
+  output_type: "manual_app_fill_checklist"
+  no_auto_execution: true
+  no_auto_click: true
+
+  required_output_sections:
+    - "APP入口路径"
+    - "字段填写清单"
+    - "系统建议值"
+    - "风险提示"
+    - "人工确认项"
+    - "截图留痕要求"
+
+  screenshot_required:
+    before_submit: true
+    after_created: true
+    after_trigger_or_end: true
+
+  if_template_status_menu_observed_only:
+    action: "do_not_recommend_for_mvp"
+    note: "只确认菜单存在的模板，不进入MVP推荐清单。"

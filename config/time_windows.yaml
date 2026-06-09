@@ -1,0 +1,93 @@
+# ETF 条件单时间窗口配置
+# 所有时间为 24 小时制，时区: Asia/Shanghai
+
+time_zone: "Asia/Shanghai"
+
+windows:
+  pre_market:
+    start: "08:30"
+    end: "09:15"
+    allowed_actions:
+      - validate_signal
+      - reserve_capacity
+    description: "盘前准备：校验信号、预留额度"
+
+  call_auction:
+    start: "09:15"
+    end: "09:25"
+    allowed_actions:
+      - observe_only
+    description: "集合竞价：仅观察，不下单"
+
+  morning_session:
+    start: "09:30"
+    end: "11:30"
+    allowed_actions:
+      - submit_order
+      - recalibrate
+      - cancel_order
+    description: "上午连续竞价：可执行全部操作"
+
+  lunch_break:
+    start: "11:30"
+    end: "13:00"
+    allowed_actions:
+      - recalibrate
+      - reserve_capacity
+    description: "午休：可重校准，不可提交新单"
+
+  afternoon_session:
+    start: "13:00"
+    end: "14:57"
+    allowed_actions:
+      - submit_order
+      - recalibrate
+      - cancel_order
+    description: "下午连续竞价：可执行全部操作"
+
+  closing_auction:
+    start: "14:57"
+    end: "15:00"
+    allowed_actions:
+      - observe_only
+    order_type_restriction: "limit_only"
+    description: "尾盘集合竞价：小规模实盘阶段仅观察，不提交条件单"
+
+  post_market:
+    start: "15:00"
+    end: "17:00"
+    allowed_actions:
+      - reconcile
+      - generate_evidence
+      - generate_report
+    description: "盘后：对账、生成证据链、出报告"
+
+outside_windows:
+  allowed_actions:
+    - validate_signal
+  description: "非交易时段：仅允许信号校验"
+
+condition_order_monitor_windows:
+  morning:
+    source_window: "morning_session"
+    monitor_start: "09:35"
+    monitor_end: "11:25"
+    dynamic_check_start: "09:20"
+    dynamic_check_end: "09:27"
+    enabled: true
+
+  afternoon:
+    source_window: "afternoon_session"
+    monitor_start: "13:05"
+    monitor_end: "14:50"
+    dynamic_check_start: "12:50"
+    dynamic_check_end: "12:57"
+    enabled: true
+    afternoon_impact_check: true
+
+hard_rules:
+  price_trigger_outside_monitor_window: "reject"
+  dynamic_check_required_before_monitor_start: true
+  submit_order_during_call_auction: "reject"
+  submit_order_during_closing_auction: "reject"
+  submit_order_after_hours: "reject"

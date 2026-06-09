@@ -1,0 +1,44 @@
+audit:
+  root_dir: "./output/audit"
+
+order_evidence:
+  per_order_dir_pattern: "{date}/{system_order_id}"
+
+  required_files:
+    - "order_summary.json"
+    - "approval_record.json"
+    - "broker_instruction.json"
+
+  screenshots:
+    app_condition_order_setting:
+      required: true
+      filename: "app_setting.png"
+
+    app_trigger_or_status:
+      required: true
+      filename: "app_status.png"
+
+    app_fill_result:
+      required_if_filled: true
+      filename: "app_fill.png"
+
+json_summary:
+  include_original_signal: true
+  include_static_validation: true
+  include_reservation: true
+  include_approval: true
+  include_dynamic_validation: true
+  include_degradation: true
+  include_recalibration: true
+  include_broker_instruction: true
+
+daily_hash:
+  enabled: true
+  algorithm: "SHA256"
+  output_file: "./output/audit/{date}/hash_manifest.sha256"
+  include_patterns:
+    - "*.json"
+    - "*.png"
+    - "*.csv"
+    - "*.xlsx"
+    - "*.log"

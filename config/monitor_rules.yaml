@@ -1,0 +1,39 @@
+market_data:
+  realtime_required: true
+  quote_stale_seconds: 300
+
+  primary_source:
+    name: "broker_app_manual_observation"
+    type: "manual"
+    description: "实盘阶段以券商APP实时行情为最终人工确认源"
+
+  optional_sources:
+    - name: "akshare"
+      enabled: false
+      purpose: "dry_run_or_reference"
+
+    - name: "tencent"
+      enabled: false
+      purpose: "dry_run_or_reference"
+
+quote_fields:
+  required:
+    - last_price
+    - bid1_price
+    - bid1_volume
+    - ask1_price
+    - ask1_volume
+    - timestamp
+
+spread_check:
+  enabled: true
+  max_spread_ticks_default: 2
+
+liquidity_check:
+  enabled: true
+  max_order_pct_of_best_level_volume: 0.50
+
+morning_close_capture:
+  enabled: true
+  time: "11:30"
+  field_name: "morning_close_price"

@@ -1,0 +1,68 @@
+# ETF 条件单 - 交易前置检查配置
+
+# 检查执行顺序：按列表顺序依次执行，任一失败即中止
+checks:
+  - id: signal_integrity
+    name: "信号完整性"
+    description: "校验信号字段齐全、格式正确"
+    required_fields:
+      - etf_code
+      - direction        # buy | sell
+      - target_quantity
+      - price_type       # limit | market | vwap
+      - trigger_condition
+    fail_action: reject
+
+  - id: etf_tradable
+    name: "ETF 可交易状态"
+    description: "确认标的当日未停牌、未触发熔断"
+    data_source: "broker_api.query_instrument_status"
+    fail_action: reject
+
+  - id: price_limit_check
+    name: "涨跌停检查"
+    description: "目标价不超出当日涨跌停板"
+    rule: "limit_down <= target_price <= limit_up"
+    fail_action: reject
+
+  - id: capacity_available
+    name: "额度可用性"
+    description: "账户剩余可用资金/券源足够覆盖本单"
+    rule: "available_capacity >= order_value"
+    fail_action: reject
+
+  - id: concentration_limit
+    name: "集中度限制"
+    description: "单只 ETF 持仓不超过组合净值上限"
+    rule: "position_after_trade / nav <= max_concentration"
+    params:
+      max_concentration: 0.25   # 25%
+    fail_action: reject
+
+  - id: daily_turnover_limit
+    name: "日内换手限制"
+    description: "当日累计交易额不超过上限"
+    rule: "daily_traded_value + order_value <= max_daily_turnover"
+    params:
+      max_daily_turnover: 50000000  # 5000 万
+    fail_action: reject
+
+  - id: duplicate_order_check
+    name: "重复下单检测"
+    description: "同方向、同标的、相近价格的重复信号拦截"
+    params:
+      time_window_seconds: 60
+      price_tolerance_pct: 0.002  # 0.2%
+    fail_action: reject
+
+  - id: blacklist_check
+    name: "黑名单检查"
+    description: "标的不在禁止交易名单中"
+    data_source: "config.blacklist"
+    fail_action: reject
+
+# 检查结果日志级别
+logging:
+  pass: INFO
+  fail: WARNING
+  error: ERROR

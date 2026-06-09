@@ -1,0 +1,68 @@
+reconcile:
+  enabled: true
+  run_after: "15:00"
+  root_dir: "./output/reconcile"
+
+inputs:
+  broker_condition_orders_csv:
+    required: true
+    path: "./input/broker_exports/condition_orders_{date}.csv"
+
+  broker_fills_csv:
+    required: true
+    path: "./input/broker_exports/fills_{date}.csv"
+
+  broker_positions_csv:
+    required: true
+    path: "./input/broker_exports/positions_{date}.csv"
+
+  broker_cash_csv:
+    required: true
+    path: "./input/broker_exports/cash_{date}.csv"
+
+  system_portfolio:
+    source: "portfolio_source.yaml"
+
+matching:
+  match_keys:
+    - etf_code
+    - direction
+    - target_quantity
+    - threshold_price
+    - time_window
+
+  time_tolerance_seconds: 60
+  price_tolerance_ticks: 2
+
+untriggered_analysis:
+  enabled: true
+  required_intraday_fields:
+    - high_price_in_window
+    - low_price_in_window
+    - window_start
+    - window_end
+
+  reason_codes:
+    PRICE_NOT_REACHED: "监控窗口内价格未达到触发阈值"
+    WINDOW_MISSED: "价格达到阈值但不在监控窗口内"
+    MANUAL_NOT_SET: "人工未在APP中设置条件单"
+    TEMPLATE_UNSUPPORTED: "券商模板不支持或未校准"
+    UNKNOWN: "原因无法自动判断"
+
+anomaly_detection:
+  slippage:
+    enabled: true
+    rule: "actual_slippage_pct > max_slippage_pct"
+    code: "SLIPPAGE_ANOMALY"
+
+  trigger_mismatch:
+    enabled: true
+    code: "TRIGGER_MISMATCH"
+
+  position_mismatch:
+    enabled: true
+    code: "POSITION_MISMATCH"
+
+output:
+  daily_report: "./output/reconcile/reconcile_{date}.xlsx"
+  anomaly_report: "./output/reconcile/anomaly_{date}.xlsx"

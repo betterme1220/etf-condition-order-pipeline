@@ -1,0 +1,92 @@
+schema_version: "1.0"
+
+required_fields:
+  - system_order_id
+  - signal_id
+  - etf_code
+  - direction
+  - target_quantity
+  - threshold_price
+  - trigger_condition
+  - broker_template
+  - time_window
+  - human_approval_status
+
+fields:
+  system_order_id:
+    type: string
+    immutable: true
+
+  signal_id:
+    type: string
+    immutable: true
+
+  etf_code:
+    type: string
+    pattern: "^[0-9]{6}$"
+    immutable_after_approval: true
+
+  direction:
+    type: enum
+    allowed: ["buy", "sell"]
+    immutable_after_approval: true
+
+  target_quantity:
+    type: integer
+    min: 100
+    lot_aligned: true
+    adjustable_by_degradation: true
+    adjustable_by_recalibration: true
+
+  threshold_price:
+    type: decimal
+    precision_source: "security_master.tick_size"
+    adjustable_by_recalibration: true
+    max_adjustment_pct: 0.005
+
+  trigger_condition:
+    type: enum
+    allowed:
+      - "last_price <= threshold_price"
+      - "last_price >= threshold_price"
+
+  broker_template:
+    type: enum
+    allowed:
+      - "price_reached_buy"
+      - "price_reached_sell"
+      - "daily_pct_change"
+
+  order_price_type:
+    type: enum
+    allowed:
+      - "即时卖一价"
+      - "即时买一价"
+      - "指定保护限价"
+
+  max_slippage_pct:
+    type: decimal
+    default: 0.003
+    adjustable_by_degradation: true
+
+  time_window:
+    type: enum
+    allowed:
+      - "morning_session"
+      - "afternoon_session"
+
+  trigger_action:
+    type: enum
+    allowed:
+      - "AUTO_ORDER"
+      - "NOTIFY_ONLY"
+    default: "NOTIFY_ONLY"
+
+  human_approval_status:
+    type: enum
+    allowed:
+      - "PENDING"
+      - "APPROVED"
+      - "REJECTED"
+      - "NEED_REVIEW"
+    default: "PENDING"

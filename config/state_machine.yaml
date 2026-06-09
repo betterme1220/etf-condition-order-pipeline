@@ -1,0 +1,73 @@
+states:
+  - CREATED
+  - VALIDATED_STATIC
+  - STATIC_CHECK_FAILED
+  - RESERVED
+  - RESERVATION_FAILED
+  - PENDING_APPROVAL
+  - APPROVED
+  - REJECTED
+  - VALIDATED_DYNAMIC
+  - DEGRADED_APPROVED
+  - RECALIBRATED
+  - BROKER_INSTRUCTION_READY
+  - MANUALLY_SET_IN_APP
+  - ACTIVE
+  - TRIGGERED
+  - FILLED
+  - PARTIALLY_FILLED
+  - CANCELLED
+  - EXPIRED
+  - RECONCILED
+  - ANOMALY
+
+transitions:
+  CREATED:
+    on_static_pass: VALIDATED_STATIC
+    on_static_fail: STATIC_CHECK_FAILED
+
+  VALIDATED_STATIC:
+    on_reserve_pass: RESERVED
+    on_reserve_fail: RESERVATION_FAILED
+
+  RESERVED:
+    on_submit_for_approval: PENDING_APPROVAL
+
+  PENDING_APPROVAL:
+    on_approved: APPROVED
+    on_rejected: REJECTED
+    on_need_review: REJECTED
+
+  APPROVED:
+    on_dynamic_pass: VALIDATED_DYNAMIC
+    on_degraded: DEGRADED_APPROVED
+    on_dynamic_fail: REJECTED
+
+  VALIDATED_DYNAMIC:
+    on_adapter_success: BROKER_INSTRUCTION_READY
+
+  DEGRADED_APPROVED:
+    on_adapter_success: BROKER_INSTRUCTION_READY
+
+  RECALIBRATED:
+    on_adapter_success: BROKER_INSTRUCTION_READY
+
+  BROKER_INSTRUCTION_READY:
+    on_manual_app_set: MANUALLY_SET_IN_APP
+
+  MANUALLY_SET_IN_APP:
+    on_window_open: ACTIVE
+
+  ACTIVE:
+    on_triggered: TRIGGERED
+    on_expired: EXPIRED
+    on_cancelled: CANCELLED
+
+  TRIGGERED:
+    on_full_fill: FILLED
+    on_partial_fill: PARTIALLY_FILLED
+    on_cancelled: CANCELLED
+
+  FILLED:
+    on_reconcile_pass: RECONCILED
+    on_reconcile_fail: ANOMALY

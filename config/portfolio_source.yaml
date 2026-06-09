@@ -1,0 +1,217 @@
+# ══════════════════════════════════════════════════════════════════
+# 持仓数据源配置
+# 系统每次运行时从 portfolio-monitor 大表读取最新持仓
+#
+# 重要约定：
+#   - 持仓表中 current_price 仅用于盘后估值/对账
+#   - 盘中动态校验必须使用实时行情源，见 monitor_rules.yaml
+#   - 持仓表中 code 必须与配置白名单或实际持仓一致，否则阻断
+# ══════════════════════════════════════════════════════════════════
+
+portfolio_source:
+  path: "D:/Finance/portfolio-monitor/data/portfolio.xlsx"
+  sheet: "持仓总表"
+  max_header_scan_rows: 50
+
+  # 如果 Excel 中直接填 10 表示 10%，0.1 表示 0.1%，用 percentage_points。
+  # 如果 Excel 单元格是百分比格式，显示为 10%，实际值是 0.1，用 auto。
+  percentage_input_mode: "percentage_points"
+
+  column_mapping:
+    security_code: "代码"
+    security_name: "名称"
+    asset_type: "类型"
+    asset_class: "资产大类"
+    current_position_qty: "持仓数量"
+    cost_price: "成本价"
+    latest_price: "最新价格/净值"
+    valuation_date: "估值日期/到期"
+    market_value: "持仓市值"
+    position_weight_pct: "仓位比例"
+    buy_channel: "买入渠道"
+    sold_or_redeemed: "是否已赎回/已卖出"
+    status_mark: "状态标记"
+    target_weight_pct: "目标仓位%"
+    buy_date: "买入日期"
+    profit_pct: "浮动盈亏%"
+    drawdown_pct: "单只回撤%"
+    trade_status: "交易状态"
+    special_mark: "特殊标记"
+    industry: "行业"
+    project_total_capital: "项目总资金"
+    batch_buy_pct: "单次买入比例%"
+    batch_sell_pct: "单次卖出比例%"
+    weekly_max_buy_batches: "每周最大买入次数"
+    weekly_used_buy_batches: "本周已买入次数"
+    allow_sell_to_zero: "允许卖到0"
+    lot_size: "最小交易单位"
+    tick_size: "价格最小变动"
+    notes: "备注"
+
+signal_light_usage:
+  description: |
+    信号灯为人工标记的持仓管理信号，来源于周度策略评审。
+    不是策略模型自动输出，不应与 sample_signal.csv 混淆。
+  values:
+    green:
+      meaning: "看好，可加仓"
+      effect:
+        rebalance: "低配时优先买入，multiplier=1.0"
+        risk_control: "正常阈值"
+
+    yellow:
+      meaning: "中性/不确定"
+      effect:
+        rebalance: "调仓量减半，multiplier=0.5"
+        risk_control: "止损阈值收紧20%"
+
+    red:
+      meaning: "看空/风险高"
+      effect:
+        rebalance: "超配时优先卖出，禁止买入"
+        risk_control: "止损阈值收紧50%"
+
+lot_size_resolution:
+  description: |
+    最小交易单位获取优先级：
+    1. 持仓大表中的“最小交易单位”列
+    2. master_data 配置文件中的定义
+    3. 都没有则阻断该标的交易
+  master_data_source: "./config/master_data.yaml"
+  default_stock_lot: 100
+  default_etf_lot: 100
+  on_missing: "block"
+
+filters:
+  etf_condition_order:
+    description: "条件单框架硬边界：仅场内ETF"
+    conditions:
+      - column: "买入渠道"
+        operator: "eq"
+        value: "场内"
+      - column: "品种"
+        operator: "eq"
+        value: "ETF"
+
+  on_market_all:
+    description: "场内全品种监控，告警用，不生成条件单"
+    conditions:
+      - column: "买入渠道"
+        operator: "eq"
+        value: "场内"
+
+  on_market_stock:
+    description: "场内股票单独监控，不进入ETF条件单流程"
+    conditions:
+      - column: "买入渠道"
+        operator: "eq"
+        value: "场内"
+      - column: "品种"
+        operator: "eq"
+        value: "股票"
+
+  off_market:
+    description: "场外基金确认子流程，不进入ETF条件单流程"
+    conditions:
+      - column: "买入渠道"
+        operator: "eq"
+        value: "场外"
+
+  clearing:
+    description: "标记为清理中的标的"
+    conditions:
+      - column: "持仓状态"
+        operator: "eq"
+        value: "清理中"
+
+  observe:
+    description: "持仓为0或观察状态的标的"
+    conditions:
+      - column: "持仓状态"
+        operator: "eq"
+        value: "观察"
+
+data_validation:
+  enabled: true
+  on_fail: "block_row"
+
+  rules:
+    - id: code_format
+      field: "code"
+      rule: "非空 且 长度=6 且 纯数字"
+      fail_message: "证券代码格式异常: {value}"
+
+    - id: quantity_non_negative
+      field: "quantity"
+      rule: "quantity >= 0"
+      fail_message: "持仓数量为负: {code} {name} quantity={value}"
+
+    - id: cost_price_valid
+      field: "cost_price"
+      rule: "status=正常 时 cost_price > 0"
+      exception: "status=观察 时允许 cost_price=0"
+      fail_message: "正常持仓成本价无效: {code} cost={value}"
+
+    - id: quantity_lot_alignment
+      field: "quantity"
+      rule: "quantity % lot_size == 0"
+      fail_message: "持仓数量不是最小交易单位整数倍: {code} qty={quantity} lot={lot_size}"
+
+    - id: profit_consistency
+      field: "profit_pct"
+      rule: |
+        如果 cost_price > 0 且 current_price > 0:
+          计算值 = (current_price - cost_price) / cost_price * 100
+          abs(profit_pct - 计算值) < 2.0
+      severity: "warn"
+      fail_message: "浮盈%与价格计算不一致: {code} 表中={profit_pct} 计算={calculated}"
+
+    - id: required_fields
+      rule: "以下字段不可全部为空"
+      fields:
+        - code
+        - name
+        - type
+        - channel
+        - status
+      fail_message: "关键字段缺失: {code} 缺少 {missing_fields}"
+
+    - id: status_enum
+      field: "status"
+      rule: "值必须在 [正常, 观察, 清理中] 中"
+      fail_message: "未知持仓状态: {code} status={value}"
+
+    - id: type_enum
+      field: "type"
+      rule: "值必须在 [股票, ETF, 可转债, 场外基金] 中"
+      fail_message: "未知品种类型: {code} type={value}"
+
+    - id: channel_enum
+      field: "channel"
+      rule: "值必须在 [场内, 场外] 中"
+      fail_message: "未知买入渠道: {code} channel={value}"
+
+  output:
+    log_all_passes: false
+    log_failures: true
+    report_path: "./output/data_quality/"
+    filename: "data_quality_{date}.txt"
+
+price_field_policy:
+  current_price:
+    source: "持仓大表"
+    update_frequency: "每日收盘后更新"
+    valid_for:
+      - "盘后估值"
+      - "对账比对"
+      - "再平衡权重计算"
+    NOT_valid_for:
+      - "盘中实时监控"
+      - "动态止损/止盈判断"
+      - "委托价格参考"
+    realtime_alternative: "monitor_rules.yaml 中配置的实时行情"
+
+  cost_price:
+    source: "持仓大表"
+    update_frequency: "交易发生时更新"
+    notes: "加仓/减仓后需重算均价并同步"
